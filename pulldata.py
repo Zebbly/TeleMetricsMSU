@@ -4,8 +4,8 @@
 #Proper use: py pulldata.py [pathOfTelemetryFile] [thresholdForAccuracy]
 #       e.g. py pulldata.py C:\Users\ZachS\Documents\telemetry-143795.log 60
 
-import os, time, sys
-import re
+import os, time, sys, datetime
+import re, json
 
 running = True
 
@@ -13,9 +13,10 @@ running = True
 try:
     telpath = sys.argv[1]
     threshold = sys.argv[2]
+    runID = sys.argv[3]
 except Exception as e:
     print(e)
-    print("Please specifiy a path for the telemetry file and accuracy threshold in this format: py pulldata.py [pathname] [threshold]")
+    print("Please specifiy a path for the telemetry file and accuracy threshold in this format: py pulldata.py [pathname] [threshold] [runID]")
     exit()
 
 #set up storage for unique reads, # of occurences of each tax_id, and low accuracy reads (and their accuracies)
@@ -24,11 +25,14 @@ taxids = dict()
 lowacc = dict()
 
 #time to wait between reading the log file again, defaulted to 30 seconds
-wait_time = 30
+wait_time = 10
 
 #set loop conditional
 running = True
 
+def timestamp():
+    return str(datetime.datetime.now()).split('.')[0]
+    
 #This function reads through all lines of a file at a path, picks out data we want (unique read_id, tax_id, and accuracy)
 #it then appends that data to our main memory storage sets(if they aren't already there)
 def update(path, threshold):
@@ -43,9 +47,16 @@ def update(path, threshold):
         taxids[tax_id] = taxids.get(tax_id, 0) + 1
         if float(accuracy) < float(threshold):
             fileloc = re.search('"filename":"(.*?)"',read).group(1)
-            lowacc[fileloc] = accuracy
-    logdata.close()
+            dataForm = {"read_id" : read_id, "tax_id" : tax_id, "accuracy" : accuracy, "location" : fileloc}
+            fileUpdate("lowaccreads" + identifier + ".txt", dataForm)
+    logdata.close()    
 
+def fileUpdate(fname, data):
+    fhand = open(fname, 'a+')
+    data_dumps = json.dumps(data)
+    fhand.write(data_dumps+"\n")
+    fhand.close()
+    
 #this function counts the number of singlets and doublets
 #then calculates the value of chao's esitmator
 def chao(ids):
@@ -63,12 +74,21 @@ def chao(ids):
     if doublets != 0 and singlets != 0:
         chaoest = (singlets^2)/(2*doublets)
     else:
+        dataForm = {"singlets" : singlets, "doublets" : doublets, "chaoest" : "Insufficient Data", "timestamp" : timestamp()}
+        fileUpdate("chaoest" + identifier + ".txt", dataForm)
         return "Insufficient Data"
     #Not sure how close you want this to 0
     if chaoest <= .1:
+        dataForm = {"singlets" : singlets, "doublets" : doublets, "chaoest" : chaoest, "timestamp" : timestamp()}
+        fileUpdate("chaoest" + identifier + ".txt", dataForm)
         return True
     else:
+        dataForm = {"singlets" : singlets, "doublets" : doublets, "chaoest" : chaoest, "timestamp" : timestamp()}
+        fileUpdate("chaoest" + identifier + ".txt", dataForm)
         return chaoest
+        
+init_timestamp = timestamp().replace('-','').replace(' ','_').replace(':', '-')
+identifier = "~" + runID + "~" + init_timestamp
 
 #main running block
 while running:
