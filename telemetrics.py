@@ -19,6 +19,7 @@ try:
     runID = args.runID
     autooff = args.auto
     wait_time = args.time
+    verbose = args.verbose
 except Exception as e:
     print(e)
     exit()
@@ -33,6 +34,15 @@ running = True
 
 def timestamp():
     return str(datetime.datetime.now()).split('.')[0]
+
+init_timestamp = timestamp().replace('-','').replace(' ','_').replace(':', '-')
+identifier = "~" + runID + "~" + init_timestamp
+dirname = identifier.strip("~")
+
+if not os.path.exists(dirname):
+    os.makedirs(dirname)
+    
+
     
 #This function reads through all lines of a file at a path, picks out data we want (unique read_id, tax_id, and accuracy)
 #it then appends that data to our main memory storage sets(if they aren't already there)
@@ -53,7 +63,7 @@ def update(path, threshold):
     logdata.close()    
 
 def fileUpdate(fname, data):
-    fhand = open(fname, 'a+')
+    fhand = open(dirname + "\\" + fname, 'a+')
     data_dumps = json.dumps(data)
     fhand.write(data_dumps+"\n")
     fhand.close()
@@ -75,21 +85,18 @@ def chao(ids):
     if doublets != 0 and singlets != 0:
         chaoest = (singlets**2)/(2*doublets)
     else:
-        dataForm = {"singlets" : singlets, "doublets" : doublets, "chaoest" : "Insufficient Data", "timestamp" : timestamp()}
-        fileUpdate("chaoest" + identifier + ".txt", dataForm)
-        return "Insufficient Data"
+        chaoest = "Insufficient Data"
     #Not sure how close you want this to 0
     if chaoest <= .1:
-        dataForm = {"singlets" : singlets, "doublets" : doublets, "chaoest" : chaoest, "timestamp" : timestamp()}
-        fileUpdate("chaoest" + identifier + ".txt", dataForm)
-        return True
-    else:
-        dataForm = {"singlets" : singlets, "doublets" : doublets, "chaoest" : chaoest, "timestamp" : timestamp()}
-        fileUpdate("chaoest" + identifier + ".txt", dataForm)
-        return chaoest
-        
-init_timestamp = timestamp().replace('-','').replace(' ','_').replace(':', '-')
-identifier = "~" + runID + "~" + init_timestamp
+        chaoest = True
+    dataForm = {"singlets" : singlets, "doublets" : doublets, "chaoest" : chaoest, "timestamp" : timestamp()}
+    fileUpdate("chaoest" + identifier + ".txt", dataForm)
+    return chaoest
+
+    
+    
+print("Runnning " + __file__ + " with parameters:")
+print(str(args).lstrip('Namespace'))
 
 #main running block
 while running:
@@ -97,19 +104,21 @@ while running:
     chaoest = chao(taxids)
     if chaoest == True:
         print("Chao estimator is close to 0, the run can be stopped")
-        running = False
+        if autooff:
+            running = False
+        time.sleep(wait_time)
     else:
-        print("Chao Estimator:" + str(chaoest))     
+        if verbose:
+            print("Chao Estimator:" + str(chaoest))     
         time.sleep(wait_time)
        
 #Things to be added:
 #   Goods estimator function
 #   Autostopping the read (theres an epi2me agent for commandline, i wonder if it is compatible with the GUI?)
-#   Code that saves low accuracy read locations in a file (?)
+
 
        
 #ideas for the code that may be useful:
 #   adding code that will check for a minimum number of correct reads before performing chao's estimator
 #       might help with inaccurate stops on the read
-#   
 
