@@ -67,10 +67,21 @@ def fileUpdate(fname, data):
     data_dumps = json.dumps(data)
     fhand.write(data_dumps+"\n")
     fhand.close()
-    
+
+def goods(species):
+    if not len(species) == 0:
+        n_organisms = 0
+        for id in species:
+            n_organisms += species[id]
+        goods_est = 1 - (len(species)/n_organisms)
+    else:
+        goods_est = "Undefined"
+    return goods_est
+           
 #this function counts the number of singlets and doublets
 #then calculates the value of chao's esitmator
-def chao(ids):
+#also calls goods estimate to put it into data
+def tests(ids):
     singlets = 0
     doublets = 0
     for id in ids:
@@ -89,11 +100,11 @@ def chao(ids):
     #Not sure how close you want this to 0
     if chaoest <= .1:
         chaoest = True
-    dataForm = {"singlets" : singlets, "doublets" : doublets, "chaoest" : chaoest, "timestamp" : timestamp()}
+    goods_est = goods(ids)
+    dataForm = {"singlets" : singlets, "doublets" : doublets, "chaoest" : chaoest, "goods" : goods_est, "timestamp" : timestamp()}
     fileUpdate("chaoest" + identifier + ".txt", dataForm)
     return chaoest
 
-    
     
 print("Runnning " + __file__ + " with parameters:")
 print(str(args).lstrip('Namespace'))
@@ -101,7 +112,7 @@ print(str(args).lstrip('Namespace'))
 #main running block
 while running:
     update(telpath, threshold)
-    chaoest = chao(taxids)
+    chaoest = tests(taxids)
     if chaoest == True:
         print("Chao estimator is close to 0, the run can be stopped")
         if autooff:
