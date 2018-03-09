@@ -1,12 +1,11 @@
 #Stats Tests from Telemetry
 #Goods Test
 #Chao Test
-#Proper use: py pulldata.py [pathOfTelemetryFile] [thresholdForAccuracy]
-#       e.g. py pulldata.py C:\Users\ZachS\Documents\telemetry-143795.log 60
 
 import os, time, sys, datetime
 import re, json, argparse
 from telparser import argumentGet
+import subprocess
 
 args = argumentGet()
 
@@ -20,6 +19,8 @@ try:
     autooff = args.auto
     wait_time = args.time
     verbose = args.verbose
+    input = args.input
+    num_barcodes = args.barcode
 except Exception as e:
     print(e)
     exit()
@@ -28,9 +29,6 @@ except Exception as e:
 reads = []
 taxids = dict()
 lowacc = dict()
-
-#set loop conditional
-running = True
 
 def timestamp():
     return str(datetime.datetime.now()).split('.')[0]
@@ -43,9 +41,16 @@ if not os.path.exists(dirname):
     os.makedirs(dirname)
     
 
-    
+  
 #This function reads through all lines of a file at a path, picks out data we want (unique read_id, tax_id, and accuracy)
 #it then appends that data to our main memory storage sets(if they aren't already there)
+def epi2me(input, process):
+    upfol = os.path.join(input, "\uploads")
+    downfol = os.path.join(input, "\downloads")
+    subprocess.call('epi2me-cli-win-2.52.1246070.exe -w ' + process + '-r ' + input + '-i ' + upfol + ' -o ' + downfol + ' -a "9bf87815842e9623e77438142d8e80eace2d4fe2"', shell=True)
+    #I have been unable to get this to work, therefore this is my best guess.
+    #epi2me-cli-win-2.52.1246070.exe -u 10004868 -i C:\Users\zebbl\Documents\reads -w 1533 --notHuman -a "9bf87815842e9623e77438142d8e80eace2d4fe2"
+    
 def update(path, threshold):
     logdata = open(path, 'r')
     for read in logdata:
@@ -94,42 +99,96 @@ def tests(ids):
     #I'm not sure if this conditional has to be here, but I figured there would be cases where there were no singlets or doublets early in the process
     #Prevents the code from erroring out
     if doublets != 0 and singlets != 0:
-        chaoest = (singlets**2)/(2*doublets)
+        chao_est = (singlets**2)/(2*doublets)
     else:
-        chaoest = "Insufficient Data"
-    #Not sure how close you want this to 0
-    if chaoest <= .1:
-        chaoest = True
+        chao_est = "Insufficient Data"
     goods_est = goods(ids)
-    dataForm = {"singlets" : singlets, "doublets" : doublets, "chaoest" : chaoest, "goods" : goods_est, "timestamp" : timestamp()}
-    fileUpdate("chaoest" + identifier + ".txt", dataForm)
-    return chaoest
+    dataForm = {"singlets" : singlets, "doublets" : doublets, "chao_est" : chao_est, "goods" : goods_est, "timestamp" : timestamp()}
+    fileUpdate("chao_est" + identifier + ".txt", dataForm)
+    return [chao_est, goods_est]
 
-    
+def testCheck(telpath, threshold, taxids, verbose):
+    update(telpath, threshold)
+    results = tests(taxids)
+    if results[0] <= .1 and results[1] == >= 99.9:
+        print("Chao estimator is close to 0, the run can be stopped")
+        return True
+    else:
+        if verbose:
+            print("Chao Estimator:" + str(results[0]))
+            print("Goods:" + str(results[1]))
+        return False
+
+def getImmediateSubdirectories(a_dir):
+    return [name for name in os.listdir(a_dir) if os.path.isdir(os.path.join(a_dir, name))]
+
+def stopRuns(dirs):
+    #This function has to stop both epi2me runs AND interact with the minIon run and stop it
+    #MinIon doesnt appear to have an API
+
+
+def telFinder(dir):
+    telPath = os.path.join(dir, "fastq\downloads\pass\epi2me-logs")
+    if os.path.isdir(telPath):
+        for file in os.listdir(telPath):
+            if os.path.getsize(os.path.join(telPath, file) > 0 and 'telemetry' in file:
+                return re.search('"telemetry-(.*?).log"', file).group(1)
+        
 print("Runnning " + __file__ + " with parameters:")
 print(str(args).lstrip('Namespace'))
 
-#main running block
-while running:
-    update(telpath, threshold)
-    chaoest = tests(taxids)
-    if chaoest == True:
-        print("Chao estimator is close to 0, the run can be stopped")
-        if autooff:
-            running = False
-        time.sleep(wait_time)
-    else:
-        if verbose:
-            print("Chao Estimator:" + str(chaoest))     
-        time.sleep(wait_time)
-       
+#Checks to see if the user specified an input, indicating they want to start a run
+if not input == None:
+    epi2me(input, 1490)
+    barcoded_dir = os.path.join(input, "\downloads\pass")
+    sub_dir = getImmediateSubdirectories(barcoded_dir)
+    run_dir = []
+    running = True
+    unread_dir = True
+    while running:
+        if unread_dir == True:                
+            for subdir in sub_dir:
+                if subdir not in run_dir:
+                    epi2me(os.path.join(barcoded_dir, subdir), 1568)
+                    run_dir.append(subdir)
+                    if len(run_dir) == num_barcodes:
+                        unread_dir = False
+        for dir in run_dir:
+            telemetry = telFinder(os.path.join(barcoded_dir, dir))
+            results = testCheck(telemetry, threshold, taxids, verbose)
+            if results == True and autooff == True:
+                stopRuns()
+                running = False
+            time.sleep(wait_time)
+else:
+    
+                
+    
+    
+
+
+
+
+
 #Things to be added:
-#   Goods estimator function
-#   Autostopping the read (theres an epi2me agent for commandline, i wonder if it is compatible with the GUI?)
+    #add join functionality for epi2me function
+    #add non-initialization functionality for chao and goods
+        #use specified telemetry file and check it until it reaches specified numbers
+        #then shut off process by joining and ending
 
 
        
 #ideas for the code that may be useful:
 #   adding code that will check for a minimum number of correct reads before performing chao's estimator
 #       might help with inaccurate stops on the read
+
+#some old code just in case the new one is jank
+    # barout_folder = input + "\downloads"
+    # barup = input + "\uploads"
+    # stsout_folder = input + "\downloads"
+    # stsup = input + "\uploads"
+    # barcodedReads = []
+    # subprocess.call('epi2me-cli-win-2.50.1003370.exe -a "9bf87815842e9623e77438142d8e80eace2d4fe2" -w 1490 -r ' + input + '-i ' + stsup + ' -o ' + barout_folder, shell=True)
+    
+    # subprocess.call('epi2me-cli-win-2.50.1003370.exe -a "9bf87815842e9623e77438142d8e80eace2d4fe2" -w 1490 -r ' + barout_folder + '-i ' + stsup + ' -o ' + stsout_folder, shell=True)
 
