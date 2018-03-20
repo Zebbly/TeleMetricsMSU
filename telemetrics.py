@@ -6,6 +6,14 @@ import os, time, sys, datetime
 import re, json, argparse
 from telparser import argumentGet
 import subprocess
+import requests
+from bs4 import BeautifulSoup
+from bs4 import UnicodeDammit
+import urllib
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 args = argumentGet()
 
@@ -21,6 +29,7 @@ try:
     verbose = args.verbose
     input = args.input
     num_barcodes = args.barcode
+    csv_get = args.csv
 except Exception as e:
     print(e)
     exit()
@@ -29,6 +38,10 @@ except Exception as e:
 reads = []
 taxids = dict()
 lowacc = dict()
+
+#set up credentials to login to epi2me
+usernameID = "paul.lepp@minotstateu.edu"
+passwordID = "PWL1minot"
 
 def timestamp():
     return str(datetime.datetime.now()).split('.')[0]
@@ -123,6 +136,7 @@ def getImmediateSubdirectories(a_dir):
     return [name for name in os.listdir(a_dir) if os.path.isdir(os.path.join(a_dir, name))]
 
 def stopRuns(dirs):
+    pass
     #This function has to stop both epi2me runs AND interact with the minIon run and stop it
     #MinIon doesnt appear to have an API
 
@@ -137,30 +151,40 @@ def telFinder(dir):
 print("Runnning " + __file__ + " with parameters:")
 print(str(args).lstrip('Namespace'))
 
+def getCSV(telnum):
+    options = webdriver.ChromeOptions()
+    options.add_argument('headless')
+    driver = webdriver.Chrome()
+    driver.implicitly_wait(30)
+    driver.get("https://epi2me.nanoporetech.com/workflow_instance/"+str(telnum)
+    username = driver.find_element_by_id("username")
+    password = driver.find_element_by_id("password")
+    username.send_keys(usernameID)
+    password.send_keys(passwordID)
+    driver.find_element_by_xpath('//a[@title="Log in"]').click()
+    time.sleep(35)
+    print('starting download')
+    driver.find_element_by_xpath('//a[@class="glyphicon glyphicon-file download-link"]').click()
+    print('waiting 5 for dl')
+    time.sleep(5)
+    driver.close()
+  
+
+
+
 #Checks to see if the user specified an input, indicating they want to start a run
 if not input == None:
     epi2me(input, 1490)
-    barcoded_dir = os.path.join(input, "\downloads\pass")
-    sub_dir = getImmediateSubdirectories(barcoded_dir)
-    run_dir = []
-    running = True
-    unread_dir = True
-    while running:
-        if unread_dir == True:                
-            for subdir in sub_dir:
-                if subdir not in run_dir:
-                    epi2me(os.path.join(barcoded_dir, subdir), 1568)
-                    run_dir.append(subdir)
-                    if len(run_dir) == num_barcodes:
-                        unread_dir = False
-        for dir in run_dir:
-            telemetry = telFinder(os.path.join(barcoded_dir, dir))
-            results = testCheck(telemetry, threshold, taxids, verbose)
-            if results == True and autooff == True:
-                stopRuns()
-                running = False
-            time.sleep(wait_time)
-else:
+    telpath = os.path.join(input, "\downloads\pass\epi2me-logs")
+telemetry = telFinder(telpath)
+while running:
+    results = testCheck(telemetry, threshold, taxids, verbose)
+    if results == True and autooff == True:
+        stopRuns()
+        getCSV()
+        running = False
+    time.sleep(wait_time)
+
     
                 
     

@@ -12,6 +12,7 @@ def argumentGet():
     parser.add_argument('-v', '--verbose', help='prints output to console', action='store_true')
     parser.add_argument('-i', '--input', help="input folder for barcoding to 16s run", default=None)
     parser.add_argument('-b', '--barcode', help="number of barcoders used", default=None)
+    parser.add_argument('-g', '--csv_get', help="toggle csv download", default=False)
     args = parser.parse_args()
     return args
 
