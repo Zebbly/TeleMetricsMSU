@@ -9,7 +9,7 @@ def argumentGet():
     parser.add_argument('runID', help='unique identifier for this run')
     parser.add_argument('-v', '--verbose', help='prints output to console', action='store_true')
     parser.add_argument('-i', '--input', help="RunID from epi2me", default=None)
-    parser.add_argument('-g', '--csv_get', help="toggle csv download", action='store_true', default=False)
+    parser.add_argument('-g', '--csv_get', help="toggle csv download DEFAULT = FALSE", action='store_true', default=False)
     parser.add_argument('-b', '--barcodes', help="valid barcodes in format: BC03,BC04")
     args = parser.parse_args()
     return args

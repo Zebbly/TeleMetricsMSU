@@ -201,12 +201,17 @@ def getCSV(telemetry):
   
 
 #Checks to see if the user specified an input, indicating they want to start a run
-while running:
-    results = testCheck(telnum, taxids, verbose)
-    if results == True and autooff == True:
-        if csv_get == True:
-            getCSV(telemetry)
-        running = False
+try:
+    while running:
+        results = testCheck(telnum, taxids, verbose)
+        if results == True and autooff == True:
+            if csv_get == True:
+                getCSV(telemetry)
+            running = False
+except KeyboardInterrupt:
+    print("Exiting script")
+    sys.exit()
+    
 
     
                 
@@ -220,11 +225,6 @@ while running:
 #ideas for the code that may be useful:
 #   adding code that will check for a minimum number of correct reads before performing chao's estimator
 #       might help with inaccurate stops on the read
-
-
-#CSV Parsing (Divided by barcodes and tests for each barcode)
-#checking all paths for viability on all machines
-#getting it operational through testing
 
 
 
